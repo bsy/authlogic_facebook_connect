@@ -38,13 +38,24 @@ module AuthlogicFacebookConnect
       end
       alias_method :facebook_uid_field=, :facebook_uid_field
 
-      
+      # What class to store the facebook uid into
+      #
+      # This is useful if you want to use an associative class to store
+      # the facebook uid instead of your primary user class.
+      #
+      # * <tt>Default:</tt> klass
+      # * <tt>Accepts:</tt> Class
       def facebook_user_class(value = nil)
         rw_config(:facebook_user_class, value, klass)
       end
       alias_method :facebook_user_class=, :facebook_user_class
 
       # Option to skip creation of new user in the auth chain
+      #
+      # This is useful if you want to handle user creation outside of the auth chain
+      #
+      # * <tt>Default:</tt> false
+      # * <tt>Accepts:</tt> Boolean
       def facebook_skip_new_user_creation(value = nil)
         rw_config(:facebook_skip_new_user_creation, value, false)
       end
@@ -69,7 +80,7 @@ module AuthlogicFacebookConnect
         facebook_session = controller.facebook_session
         self.attempted_record = facebook_user_class.find(:first, :conditions => { facebook_uid_field => facebook_session.user.uid }).try(:"#{klass}".to_s.underscore)
 
-        unless facebook_skip_new_user_creation && self.attempted_record
+        unless facebook_skip_new_user_creation || self.attempted_record
           begin
             # Get the user from facebook and create a local user.
             #
