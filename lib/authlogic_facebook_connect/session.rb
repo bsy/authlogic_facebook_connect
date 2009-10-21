@@ -37,6 +37,19 @@ module AuthlogicFacebookConnect
         rw_config(:facebook_uid_field, value, :facebook_uid)
       end
       alias_method :facebook_uid_field=, :facebook_uid_field
+
+      
+      def facebook_user_class(value = nil)
+        rw_config(:facebook_user_class, value, klass)
+      end
+      alias_method :facebook_user_class=, :facebook_user_class
+
+      # Option to skip creation of new user in the auth chain
+      def facebook_skip_new_user_creation(value = nil)
+        rw_config(:facebook_skip_new_user_creation, value, false)
+      end
+      alias_method :facebook_skip_new_user_creation=, :facebook_skip_new_user_creation
+      
     end
 
     module Methods
@@ -54,17 +67,19 @@ module AuthlogicFacebookConnect
 
       def validate_by_facebook_connect
         facebook_session = controller.facebook_session
+        self.attempted_record = facebook_user_class.find(:first, :conditions => { facebook_uid_field => facebook_session.user.uid }).try(:"#{klass}".to_s.underscore)
 
-        self.attempted_record =
-          klass.find(:first, :conditions => { facebook_uid_field => facebook_session.user.uid })
-
-        unless self.attempted_record
+        unless facebook_skip_new_user_creation && self.attempted_record
           begin
             # Get the user from facebook and create a local user.
             #
             # We assign it after the call to new in case the attribute is protected.
             new_user = klass.new
-            new_user.send(:"#{facebook_uid_field}=", facebook_session.user.uid)
+            if klass == facebook_user_class
+              new_user.send(:"#{facebook_uid_field}=", facebook_session.user.uid)
+            else
+              new_user.send(:"build_#{facebook_user_class.to_s.underscore}", :"#{facebook_uid_field}" => facebook_session.user.uid)
+            end                         
 
             new_user.before_connect(facebook_session) if new_user.respond_to?(:before_connect)
             
@@ -87,8 +102,8 @@ module AuthlogicFacebookConnect
         end
       end
 
-      def authenticating_with_facebook_connect?
-        controller.set_facebook_session
+      def authenticating_with_facebook_connect?        
+        controller.set_facebook_session        
         attempted_record.nil? && errors.empty? && controller.facebook_session
       end
 
@@ -100,6 +115,14 @@ module AuthlogicFacebookConnect
         def facebook_uid_field
           self.class.facebook_uid_field
         end
+
+       def facebook_user_class
+         self.class.facebook_user_class
+       end
+       
+       def facebook_skip_new_user_creation
+         self.class.facebook_skip_new_user_creation
+       end       
     end
   end
 end
